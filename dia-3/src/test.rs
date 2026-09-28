@@ -81,3 +81,24 @@ fn test_invest_not_whitelisted() {
     env.mock_all_auths();
     client.invest(&investor, &500);
 }
+
+#[test]
+fn test_invest_minimum_amount() {
+    let env = Env::default();
+    let (admin, payment_token, _contract_id, client) = setup_with_payment_token(&env);
+    let investor = Address::generate(&env);
+
+    StellarAssetClient::new(&env, &payment_token).mint(&investor, &1_000);
+
+    env.mock_all_auths();
+    client.set_whitelist(&admin, &investor, &true);
+
+    // 100 < 500 -> AmountTooLow (#7)
+    let res = client.try_invest(&investor, &100);
+    assert_eq!(res, Err(Ok(Error::AmountTooLow.into())));
+    assert_eq!(client.balance(&investor), 0);
+
+    // 500 -> ok
+    assert_eq!(client.invest(&investor, &500), 5);
+    assert_eq!(client.balance(&investor), 5);
+}
